@@ -89,19 +89,18 @@ try:
 
                 rent_nights = driver.get_variable(
                     'window.__INITIAL_STATE__.listingReducer.rateSummary.rentNights')
+                average_rent_night = float(driver.select(
+                    '.rental-price__amount').get_attribute('textContent').replace('$', ''))
                 begin_date_rent_nights = dateparser.parse(driver.get_variable(
                     'window.__INITIAL_STATE__.listingReducer.rateSummary.beginDate')).date()
                 end_date_rent_nights = dateparser.parse(driver.get_variable(
                     'window.__INITIAL_STATE__.listingReducer.rateSummary.endDate')).date()
                 flat_fees = driver.get_variable(
                     'window.__INITIAL_STATE__.listingReducer.rateSummary.flatFees')
-            except:
-                print('  There was an error scraping this page.\n')
+            except Exception as e:
+                print(f'  There was an error scraping this page: {e}\n')
                 return False
 
-            if type(rent_nights) != list:
-                print('  rentNights is null. Skipping.\n')
-                return False
             cleaning_fee_min = None
             cleaning_fee_max = None
             for fee in flat_fees:
@@ -120,18 +119,21 @@ try:
                 }
                 d += timedelta(days=1)
 
-            d = begin_date_rent_nights
-            for rent_night in rent_nights:
-                if info_dates.get(d):
-                    info_dates[d]['rent_night'] = rent_night
-                else:
-                    info_dates[d] = {'rent_night': rent_night,
-                                     "availability": None, "min_stay": None}
-                d += timedelta(days=1)
+            if rent_nights == None:
+                print('  WARNING: rentNights is null.')
+            else:
+                d = begin_date_rent_nights
+                for rent_night in rent_nights:
+                    if info_dates.get(d):
+                        info_dates[d]['rent_night'] = rent_night
+                    else:
+                        info_dates[d] = {'rent_night': rent_night,
+                                         "availability": None, "min_stay": None}
+                    d += timedelta(days=1)
 
-            return info_dates, availability_updated, name, cleaning_fee_min
+            return info_dates, availability_updated, name, cleaning_fee_min, average_rent_night
 
-        def add_to_csv_file(info_dates, availability_updated, name, cleaning_fee_min):
+        def add_to_csv_file(info_dates, availability_updated, name, cleaning_fee, average_rent_night):
             added_count = 0
             ignored_count = 0
             date = begin_date
@@ -142,7 +144,8 @@ try:
                         date,
                         availability_updated,
                         name,
-                        cleaning_fee_min,
+                        cleaning_fee,
+                        average_rent_night,
                         **info_dates[date]
                     )
                     if was_added:

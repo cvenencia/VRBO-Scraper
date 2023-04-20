@@ -36,6 +36,8 @@ def get_driver():
 class CSV_Queue:
     def __init__(self, path):
         self.path = path
+        self.columns = ['scrape_date', 'name', 'cleaning_fee', 'property_id', 'rental_date',
+                        'availability_updated', 'rent_night', 'average_rent_night', 'min_stay', 'availability']
         try:
             print('Reading output CSV file...', end=" ")
             def date_converter(date): return dateparser.parse(date).date()
@@ -47,21 +49,19 @@ class CSV_Queue:
                     "availability_updated": date_converter
                 }
             )
-            if not set(['scrape_date', 'name', 'cleaning_fee', 'property_id', 'rental_date',
-                        'availability_updated', 'rent_night', 'min_stay', 'availability']).issubset(self.data.columns):
+            if not set(self.columns).issubset(self.data.columns):
                 raise SyntaxError
 
             print('Done reading.')
         except FileNotFoundError:
             print('The file doesn\'t exist. Creating new one.')
-            self.data = pd.DataFrame(columns=['scrape_date', 'name', 'cleaning_fee', 'property_id', 'rental_date',
-                                              'availability_updated', 'rent_night', 'min_stay', 'availability'])
+            self.data = pd.DataFrame(columns=self.columns)
 
-    def add(self, property_id, rental_date, availability_updated, name, cleaning_fee, rent_night, min_stay, availability):
+    def add(self, property_id, rental_date, availability_updated, name, cleaning_fee, average_rent_night, rent_night, min_stay, availability):
         scrape_date = datetime.now().date()
         if not self.already_in_queue(property_id, rental_date, scrape_date, availability_updated):
             new_row = [scrape_date, name, cleaning_fee, property_id, rental_date,
-                       availability_updated, rent_night, min_stay, availability]
+                       availability_updated, rent_night, average_rent_night, min_stay, availability]
             self.data.loc[len(self.data)] = new_row
             return True
         else:
