@@ -66,119 +66,116 @@ except pd.errors.ParserError:
 except SyntaxError:
     print('\nERROR: this CSV file has the wrong structure. Please provide a valid file, if not, provide a path to a non-existing file.')
     exit(1)
-
 try:
-    driver = get_driver()
-    print()
-    for code in codes:
+    with get_driver() as driver:
+        print()
+        for code in codes:
 
-        def scrape_page():
-            try:
-                availability = driver.get_variable(
-                    'window.__INITIAL_STATE__.listingReducer.availabilityCalendar.availability.unitAvailabilityConfiguration.availability')
-                min_stay = driver.get_variable(
-                    'window.__INITIAL_STATE__.listingReducer.availabilityCalendar.availability.unitAvailabilityConfiguration.minStay').split(',')
-                begin_date_availability = dateparser.parse(driver.get_variable(
-                    'window.__INITIAL_STATE__.listingReducer.availabilityCalendar.availability.dateRange.beginDate')).date()
-                end_date_availability = dateparser.parse(driver.get_variable(
-                    'window.__INITIAL_STATE__.listingReducer.availabilityCalendar.availability.dateRange.endDate')).date()
-                availability_updated = dateparser.parse(driver.get_variable(
-                    'window.__INITIAL_STATE__.listingReducer.availabilityUpdated')).date()
-                name = driver.get_variable(
-                    'window.__INITIAL_STATE__.listingReducer.headline')
+            def scrape_page():
+                try:
+                    availability = driver.get_variable(
+                        'window.__INITIAL_STATE__.listingReducer.availabilityCalendar.availability.unitAvailabilityConfiguration.availability')
+                    min_stay = driver.get_variable(
+                        'window.__INITIAL_STATE__.listingReducer.availabilityCalendar.availability.unitAvailabilityConfiguration.minStay').split(',')
+                    begin_date_availability = dateparser.parse(driver.get_variable(
+                        'window.__INITIAL_STATE__.listingReducer.availabilityCalendar.availability.dateRange.beginDate')).date()
+                    end_date_availability = dateparser.parse(driver.get_variable(
+                        'window.__INITIAL_STATE__.listingReducer.availabilityCalendar.availability.dateRange.endDate')).date()
+                    availability_updated = dateparser.parse(driver.get_variable(
+                        'window.__INITIAL_STATE__.listingReducer.availabilityUpdated')).date()
+                    name = driver.get_variable(
+                        'window.__INITIAL_STATE__.listingReducer.headline')
 
-                rent_nights = driver.get_variable(
-                    'window.__INITIAL_STATE__.listingReducer.rateSummary.rentNights')
-                average_rent_night = float(driver.select(
-                    '.rental-price__amount').get_attribute('textContent').replace('$', ''))
-                begin_date_rent_nights = dateparser.parse(driver.get_variable(
-                    'window.__INITIAL_STATE__.listingReducer.rateSummary.beginDate')).date()
-                end_date_rent_nights = dateparser.parse(driver.get_variable(
-                    'window.__INITIAL_STATE__.listingReducer.rateSummary.endDate')).date()
-                flat_fees = driver.get_variable(
-                    'window.__INITIAL_STATE__.listingReducer.rateSummary.flatFees')
-            except Exception as e:
-                print(f'  There was an error scraping this page: {e}\n')
-                return False
+                    rent_nights = driver.get_variable(
+                        'window.__INITIAL_STATE__.listingReducer.rateSummary.rentNights')
+                    average_rent_night = float(driver.select(
+                        '.rental-price__amount').get_attribute('textContent').replace('$', ''))
+                    begin_date_rent_nights = dateparser.parse(driver.get_variable(
+                        'window.__INITIAL_STATE__.listingReducer.rateSummary.beginDate')).date()
+                    end_date_rent_nights = dateparser.parse(driver.get_variable(
+                        'window.__INITIAL_STATE__.listingReducer.rateSummary.endDate')).date()
+                    flat_fees = driver.get_variable(
+                        'window.__INITIAL_STATE__.listingReducer.rateSummary.flatFees')
+                except Exception as e:
+                    print(f'  There was an error scraping this page: {e}\n')
+                    return False
 
-            cleaning_fee_min = None
-            cleaning_fee_max = None
-            for fee in flat_fees:
-                if fee['type'] != 'CLEANING_FEE':
-                    continue
-                cleaning_fee_min = fee['minAmount']
-                cleaning_fee_max = fee['maxAmount']
+                cleaning_fee_min = None
+                cleaning_fee_max = None
+                for fee in flat_fees:
+                    if fee['type'] != 'CLEANING_FEE':
+                        continue
+                    cleaning_fee_min = fee['minAmount']
+                    cleaning_fee_max = fee['maxAmount']
 
-            info_dates = {}
-            d = begin_date_availability
-            for (is_available, min_stayy) in zip(availability, min_stay):
-                info_dates[d] = {
-                    "availability": True if is_available == 'Y' else False,
-                    "min_stay": int(min_stayy),
-                    "rent_night": None
-                }
-                d += timedelta(days=1)
-
-            if rent_nights == None:
-                print('  WARNING: rentNights is null.')
-            else:
-                d = begin_date_rent_nights
-                for rent_night in rent_nights:
-                    if info_dates.get(d):
-                        info_dates[d]['rent_night'] = rent_night
-                    else:
-                        info_dates[d] = {'rent_night': rent_night,
-                                         "availability": None, "min_stay": None}
+                info_dates = {}
+                d = begin_date_availability
+                for (is_available, min_stayy) in zip(availability, min_stay):
+                    info_dates[d] = {
+                        "availability": True if is_available == 'Y' else False,
+                        "min_stay": int(min_stayy),
+                        "rent_night": None
+                    }
                     d += timedelta(days=1)
 
-            return info_dates, availability_updated, name, cleaning_fee_min, average_rent_night
+                if rent_nights == None:
+                    print('  WARNING: rentNights is null.')
+                else:
+                    d = begin_date_rent_nights
+                    for rent_night in rent_nights:
+                        if info_dates.get(d):
+                            info_dates[d]['rent_night'] = rent_night
+                        else:
+                            info_dates[d] = {'rent_night': rent_night,
+                                             "availability": None, "min_stay": None}
+                        d += timedelta(days=1)
 
-        def add_to_csv_file(info_dates, availability_updated, name, cleaning_fee, average_rent_night):
-            added_count = 0
-            ignored_count = 0
-            date = begin_date
-            while date <= end_date:
-                if info_dates.get(date):
-                    was_added = csv_queue.add(
-                        code,
-                        date,
-                        availability_updated,
-                        name,
-                        cleaning_fee,
-                        average_rent_night,
-                        **info_dates[date]
-                    )
-                    if was_added:
-                        added_count += 1
-                    else:
-                        ignored_count += 1
-                date += timedelta(days=1)
+                return info_dates, availability_updated, name, cleaning_fee_min, average_rent_night
 
-            return added_count, ignored_count
+            def add_to_csv_file(info_dates, availability_updated, name, cleaning_fee, average_rent_night):
+                added_count = 0
+                ignored_count = 0
+                date = begin_date
+                while date <= end_date:
+                    if info_dates.get(date):
+                        was_added = csv_queue.add(
+                            code,
+                            date,
+                            availability_updated,
+                            name,
+                            cleaning_fee,
+                            average_rent_night,
+                            **info_dates[date]
+                        )
+                        if was_added:
+                            added_count += 1
+                        else:
+                            ignored_count += 1
+                    date += timedelta(days=1)
 
-        url = f'https://www.vrbo.com/{code}'
-        driver.get(url)
-        print(f'Scraping {url}...')
-        data = scrape_page()
-        if not data:
-            continue
-        added_count, ignored_count = add_to_csv_file(*data)
-        print(f'  Name: {data[2]}')
-        print(
-            f'  {added_count} record{"s were" if added_count != 1 else " was"} added from this page.')
-        print(
-            f'  {ignored_count} record{"s were" if ignored_count != 1 else " was"} ignored because they were already added.')
-        print()
+                return added_count, ignored_count
+
+            url = f'https://www.vrbo.com/{code}'
+            driver.get(url)
+            print(f'Scraping {url}...')
+            data = scrape_page()
+            if not data:
+                continue
+            added_count, ignored_count = add_to_csv_file(*data)
+            print(f'  Name: {data[2]}')
+            print(
+                f'  {added_count} record{"s were" if added_count != 1 else " was"} added from this page.')
+            print(
+                f'  {ignored_count} record{"s were" if ignored_count != 1 else " was"} ignored because they were already added.')
+            print()
+            csv_queue.to_csv_file()
+
+        print('Scraping process done!')
+
         csv_queue.to_csv_file()
-
-    print('Scraping process done!')
-
-    driver.quit()
-    csv_queue.to_csv_file()
 except KeyboardInterrupt:
     print('Keyboard Interrupt detected.')
 except Exception as e:
     print(f'An unexpected error ocurred: {e}')
 finally:
     print('Closing Chrome driver...')
-    driver.quit()
