@@ -20,13 +20,22 @@ class CustomChrome(Chrome):
 
 def get_driver():
     chrome_options = ChromeOptions()
+    user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36"
 
-    chrome_options.add_argument("--disable-infobars")
-    chrome_options.add_argument("--start-maximized")
-    chrome_options.add_argument("--disable-extensions")
-    chrome_options.add_argument('--window-size=1920,1080')
-    chrome_options.add_argument("--headless")
+    chrome_options.headless = True
+    chrome_options.add_argument(f'user-agent={user_agent}')
     chrome_options.add_argument('log-level=3')
+    chrome_options.add_argument("--window-size=1920,1080")
+    chrome_options.add_argument('--ignore-certificate-errors')
+    chrome_options.add_argument('--allow-running-insecure-content')
+    chrome_options.add_argument("--disable-extensions")
+    chrome_options.add_argument("--proxy-server='direct://'")
+    chrome_options.add_argument("--proxy-bypass-list=*")
+    chrome_options.add_argument("--start-maximized")
+    chrome_options.add_argument('--disable-gpu')
+    chrome_options.add_argument('--disable-dev-shm-usage')
+    chrome_options.add_argument('--no-sandbox')
+    chrome_options.add_argument('--lang=en-GB')
     # chrome_options.add_experimental_option(
     #     'excludeSwitches', ['enable-logging'])
 
@@ -36,6 +45,8 @@ def get_driver():
 class CSV_Queue:
     def __init__(self, path):
         self.path = path
+        self.columns = ['scrape_date', 'name', 'cleaning_fee', 'property_id', 'rental_date',
+                        'availability_updated', 'rent_night', 'average_rent_night', 'min_stay', 'availability']
         try:
             print('Reading output CSV file...', end=" ")
             def date_converter(date): return dateparser.parse(date).date()
@@ -47,21 +58,19 @@ class CSV_Queue:
                     "availability_updated": date_converter
                 }
             )
-            if not set(['scrape_date', 'name', 'cleaning_fee', 'property_id', 'rental_date',
-                        'availability_updated', 'rent_night', 'min_stay', 'availability']).issubset(self.data.columns):
+            if not set(self.columns).issubset(self.data.columns):
                 raise SyntaxError
 
             print('Done reading.')
         except FileNotFoundError:
             print('The file doesn\'t exist. Creating new one.')
-            self.data = pd.DataFrame(columns=['scrape_date', 'name', 'cleaning_fee', 'property_id', 'rental_date',
-                                              'availability_updated', 'rent_night', 'min_stay', 'availability'])
+            self.data = pd.DataFrame(columns=self.columns)
 
-    def add(self, property_id, rental_date, availability_updated, name, cleaning_fee, rent_night, min_stay, availability):
+    def add(self, property_id, rental_date, availability_updated, name, cleaning_fee, average_rent_night, rent_night, min_stay, availability):
         scrape_date = datetime.now().date()
         if not self.already_in_queue(property_id, rental_date, scrape_date, availability_updated):
             new_row = [scrape_date, name, cleaning_fee, property_id, rental_date,
-                       availability_updated, rent_night, min_stay, availability]
+                       availability_updated, rent_night, average_rent_night, min_stay, availability]
             self.data.loc[len(self.data)] = new_row
             return True
         else:
