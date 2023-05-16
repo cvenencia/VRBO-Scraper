@@ -1,6 +1,7 @@
 import argparse
 import pandas as pd
 from utils import get_driver, CSV_Queue
+import traceback
 
 import dateparser
 from datetime import timedelta
@@ -11,6 +12,7 @@ parser.add_argument("--begin-date", help="Begin date")
 parser.add_argument("--end-date", help="End date")
 parser.add_argument("--csv-input-file", help="Path to csv input file")
 parser.add_argument("--csv-output-file", help="Path to csv output file")
+parser.add_argument("--csv-dates-file", help="Path to csv dates file")
 
 args = parser.parse_args()
 missing_args = False
@@ -24,6 +26,10 @@ if not args.end_date:
 
 if not args.csv_input_file:
     print('Missing required argument: --csv-input-file.')
+    missing_args = True
+
+if not args.csv_dates_file:
+    print('Missing required argument: --csv-dates-file.')
     missing_args = True
 
 if missing_args:
@@ -60,14 +66,18 @@ except KeyError:
     exit(1)
 
 csv_output_path = args.csv_output_file or "data.csv"
+csv_dates_path = args.csv_dates_file
 
 try:
-    csv_queue = CSV_Queue(csv_output_path)
+    csv_queue = CSV_Queue(csv_output_path, csv_dates_path)
 except pd.errors.ParserError:
     print('\nERROR: Invalid output CSV file.')
     exit(1)
 except SyntaxError:
     print('\nERROR: this CSV file has the wrong structure. Please provide a valid file, if not, provide a path to a non-existing file.')
+    exit(1)
+except FileNotFoundError:
+    print('\nERROR: CSV dates file does not exist.')
     exit(1)
 
 
@@ -269,6 +279,7 @@ try:
 except KeyboardInterrupt:
     print('Keyboard Interrupt detected.')
 except Exception as e:
-    print(f'An unexpected error ocurred: {e}')
+    print(f'An unexpected error ocurred:')
+    traceback.print_exc()
 finally:
     print('Closing Chrome driver...')

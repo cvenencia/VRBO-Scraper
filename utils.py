@@ -47,18 +47,19 @@ def get_driver():
 
 
 class CSV_Queue:
-    def __init__(self, path):
-        self.path = path
+    def __init__(self, output_path, dates_path):
+        self.output_path = output_path
+        self.dates_path = dates_path
         self.columns = ['scrape_date', 'cleaning_fee', 'property_id', 'source', 'rental_date',
-                        'availability_updated', 'rent_night', 'average_rent_night', 'min_stay', 'availability', 'name']
+                        'availability_updated', 'rent_night', 'average_rent_night', 'min_stay', 'availability', 'status', 'day_of_week', 'weblink', 'name']
+
+        def date_converter(date):
+            if date != '':
+                return dateparser.parse(date).date()
         try:
             print('Reading output CSV file...')
-
-            def date_converter(date):
-                if date != '':
-                    return dateparser.parse(date).date()
             self.data = pd.read_csv(
-                self.path,
+                self.output_path,
                 converters={
                     "scrape_date": date_converter,
                     "rental_date": date_converter,
@@ -67,17 +68,62 @@ class CSV_Queue:
             )
             if not set(self.columns).issubset(self.data.columns):
                 raise SyntaxError
-
             print('Done reading.')
+
         except FileNotFoundError:
             print('The file doesn\'t exist. Creating new one.')
             self.data = pd.DataFrame(columns=self.columns)
 
+        print('Reading dates CSV file...')
+        self.dates = pd.read_csv(self.dates_path, converters={
+                                 'dates': date_converter})
+        print('Done reading')
+
+    def get_status(self, availability, property_id, rental_date, scrape_date):
+        if availability:
+            return 'available'
+        filtered_data = self.data.loc[(self.data['property_id'] == property_id) & (
+            self.data['rental_date'] == rental_date) & (self.data['scrape_date'] != scrape_date)]
+        if (filtered_data['availability'] == True).any():
+            return 'likely rented'
+        else:
+            return 'not listed'
+
+    def get_day_of_week(self, date):
+        if not (self.dates.loc[self.dates['dates'] == date]).empty:
+            return 'holiday'
+        else:
+            weekday = date.weekday()
+            if weekday == 0:
+                return 'monday'
+            elif weekday == 1:
+                return 'tuesday'
+            elif weekday == 2:
+                return 'wednesday'
+            elif weekday == 3:
+                return 'thursday'
+            elif weekday == 4:
+                return 'friday'
+            elif weekday == 5:
+                return 'saturday'
+            elif weekday == 6:
+                return 'sunday'
+
+    def get_weblink(self, source, property_id):
+        if source == 'vacasa':
+            return f'https://vacasa.com/unit/{property_id}'
+        else:
+            return f'https://vrbo.com/{property_id}'
+
     def add(self, source, property_id, rental_date, availability_updated, name, cleaning_fee, average_rent_night, rent_night, min_stay, availability):
         scrape_date = datetime.now().date()
         if not self.already_in_queue(source, property_id, rental_date, scrape_date, availability_updated):
+            status = self.get_status(
+                availability, property_id, rental_date, scrape_date)
+            day_of_week = self.get_day_of_week(rental_date)
+            weblink = self.get_weblink(source, property_id)
             new_row = [scrape_date, cleaning_fee, property_id, source, rental_date,
-                       availability_updated, rent_night, average_rent_night, min_stay, availability, name]
+                       availability_updated, rent_night, average_rent_night, min_stay, availability, status, day_of_week, weblink, name]
             self.data.loc[len(self.data)] = new_row
             return True
         else:
@@ -97,7 +143,7 @@ class CSV_Queue:
                                      & (self.data['scrape_date'] == scrape_date)].empty
 
     def to_csv_file(self):
-        return self.data.to_csv(self.path, index=False)
+        return self.data.to_csv(self.output_path, index=False)
 
     def __len__(self):
         return len(self.data.index)
