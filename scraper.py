@@ -108,7 +108,7 @@ def vrbo(code):
             rent_nights = driver.get_variable(
                 'window.__INITIAL_STATE__.listingReducer.rateSummary.rentNights')
             average_rent_night = float(driver.select(
-                '.rental-price__amount').get_attribute('textContent').replace('$', ''))
+                '.rental-price__amount').get_attribute('textContent').replace('$', '').replace(',', ''))
             begin_date_rent_nights = dateparser.parse(driver.get_variable(
                 'window.__INITIAL_STATE__.listingReducer.rateSummary.beginDate')).date()
             end_date_rent_nights = dateparser.parse(driver.get_variable(
@@ -118,6 +118,7 @@ def vrbo(code):
         except Exception as e:
             if retries == 3:
                 print(f'  There was an error scraping this page: {e}\n')
+                traceback.print_exc()
             return False
 
         cleaning_fee_min = None
