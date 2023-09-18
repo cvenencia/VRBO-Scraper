@@ -1,11 +1,10 @@
-from selenium.webdriver import Chrome
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.options import Options as ChromeOptions
-from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
-
-import pandas as pd
 from datetime import datetime
+
 import dateparser
+import pandas as pd
+from selenium.webdriver import Chrome
+from selenium.webdriver.chrome.options import Options as ChromeOptions
+from selenium.webdriver.common.by import By
 
 
 class CustomChrome(Chrome):
@@ -23,8 +22,6 @@ def get_driver():
     chrome_options = ChromeOptions()
     user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36"
 
-    caps = DesiredCapabilities().CHROME
-    caps['pageLoadStrategy'] = 'eager'
     chrome_options.headless = True
     chrome_options.add_argument(f'user-agent={user_agent}')
     chrome_options.add_argument('log-level=3')
@@ -39,10 +36,8 @@ def get_driver():
     chrome_options.add_argument('--disable-dev-shm-usage')
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument('--lang=en-GB')
-    # chrome_options.add_experimental_option(
-    #     'excludeSwitches', ['enable-logging'])
+    chrome_options.set_capability('pageLoadStrategy', 'eager')
 
-    return CustomChrome(options=chrome_options, desired_capabilities=caps)
     return CustomChrome(options=chrome_options)
 
 
